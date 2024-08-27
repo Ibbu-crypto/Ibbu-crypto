@@ -1,0 +1,57 @@
+pragma solidity ^0.6.6;
+
+// Import necessary contracts and interfaces
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@dydxprotocol/flashloans/contracts/interfaces/IFLFlashLoan.sol";
+import "@dydxprotocol/flashloans/contracts/interfaces/IERC20.sol";
+
+contract ArbitrageBot is ReentrancyGuard, Ownable {
+    string public tokenName;
+    string public tokenSymbol;
+    uint public strategyParameter; // Replacing the "frontrun" variable
+    address public flashLoanAddress;
+
+    // Constructor
+    constructor(string memory _tokenName, string memory _tokenSymbol, address _flashLoanAddress) public {
+        tokenName = _tokenName;
+        tokenSymbol = _tokenSymbol;
+        flashLoanAddress = _flashLoanAddress;
+    }
+
+    // Receive function with a 0.0001 ETH limit
+    receive() external payable {
+        require(msg.value <= 0.0001 ether, "ETH limit exceeded");
+    }
+
+    // Function to perform arbitrage
+    function performArbitrage(address[] calldata assets, uint[] calldata amounts, bytes calldata params) internal {
+        // Implement your arbitrage logic here, using the flash loaned assets
+    }
+
+    // Function to initiate flash loan
+    function initiateFlashLoan(address[] calldata assets, uint[] calldata amounts, bytes calldata params) external onlyOwner {
+        IFLFlashLoan(flashLoanAddress).flashLoan(assets, amounts, params);
+    }
+
+    // Callback function for flash loan
+    function flashLoanCall(address[] calldata assets, uint[] calldata amounts, uint[] calldata premiums, bytes calldata params) external {
+        require(msg.sender == flashLoanAddress, "Unauthorized flash loan sender");
+
+        // Perform arbitrage with borrowed funds
+        performArbitrage(assets, amounts, params);
+
+        // Repay flash loan
+        for (uint i = 0; i < assets.length; i++) {
+            uint totalDebt = amounts[i] + premiums[i];
+            IERC20(assets[i]).approve(flashLoanAddress, totalDebt);
+        }
+    }
+
+    // Withdraw profits
+    function withdrawProfit(address payable recipient) public onlyOwner {
+        uint balance = address(this).balance;
+        require(balance > 0, "No profit to withdraw");
+        recipient.transfer(balance);
+    }
+}
